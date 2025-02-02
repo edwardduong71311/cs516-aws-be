@@ -13,6 +13,7 @@ Parameters:
     Description: GitHub username or organization
   FERepo:
     Type: String
+    Default: cs516-aws-fe
     Description: GitHub repository name
   FEBranch:
     Type: String
@@ -20,6 +21,7 @@ Parameters:
     Description: Branch to track in the GitHub repository
   BERepo:
     Type: String
+    Default: cs516-aws-be
     Description: GitHub repository name
   BEBranch:
     Type: String
@@ -27,18 +29,18 @@ Parameters:
     Description: Branch to track in the GitHub repository
 
 Resources:
-#  S3Website:
-#    Type: AWS::S3::Bucket
-#    Properties:
-#      BucketName: !Sub "${StackPrefix}-website"
-#      PublicAccessBlockConfiguration:
-#        BlockPublicAcls: false
-#        BlockPublicPolicy: false
-#        IgnorePublicAcls: false
-#        RestrictPublicBuckets: false
-#      WebsiteConfiguration:
-#        IndexDocument: index.html
-#        ErrorDocument: error.html
+  S3Website:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${StackPrefix}-website"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
 #
 #  BucketPolicy:
 #    Type: AWS::S3::BucketPolicy
@@ -495,12 +497,36 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: "aws/codebuild/amazonlinux-x86_64-standard:5.0"
         Type: LINUX_CONTAINER
-        EnvironmentVariables:
-          - Name: JAVA_HOME
-            Value: "/usr/lib/jvm/java-17-amazon-corretto"
       Cache:
         Type: S3
         Location: !Ref PipelineArtifactBucket
+
+  CodeBuildDeployLambda:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${StackPrefix}-be-codebuild"
+      ServiceRole: !GetAtt CodePipelineRole.Arn
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: "aws/codebuild/amazonlinux-x86_64-standard:5.0"
+        Type: LINUX_CONTAINER
+      Source:
+        Type: CODEPIPELINE
+        Location: !Ref PipelineArtifactBucket
+        BuildSpec: !Sub |
+          version: 0.2
+          phases:
+            build:
+              commands:
+                - aws lambda update-function-code --function-name "${LambdaLogin}" --s3-bucket "${PipelineArtifactBucket}" --s3-key target/my-application.jar
+                - aws lambda update-function-code --function-name "${LambdaRegister}" --s3-bucket "${PipelineArtifactBucket}" --s3-key target/my-application.jar
+                - aws lambda update-function-code --function-name "${LambdaGetImage}" --s3-bucket "${PipelineArtifactBucket}" --s3-key target/my-application.jar
+                - aws lambda update-function-code --function-name "${LambdaGetInfo}" --s3-bucket "${PipelineArtifactBucket}" --s3-key target/my-application.jar
+                - aws lambda update-function-code --function-name "${LambdaImageUploaded}" --s3-bucket "${PipelineArtifactBucket}" --s3-key target/my-application.jar
+                - aws lambda update-function-code --function-name "${LambdaRequestUploadImage}" --s3-bucket "${PipelineArtifactBucket}" --s3-key target/my-application.jar
+      Artifacts:
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 20
 
   BECodePipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -547,76 +573,14 @@ Resources:
 
         - Name: Deploy
           Actions:
-            - Name: DeployLoginFunc
+            - Name: DeployLambda
               ActionTypeId:
-                Category: Deploy
+                Category: Build
                 Owner: AWS
-                Provider: Lambda
+                Provider: CodeBuild
                 Version: "1"
               Configuration:
-                FunctionName: !Ref LambdaLogin
-                S3Bucket: !Ref PipelineArtifactBucket
-                S3Key: target/my-application.jar
-              InputArtifacts:
-                - Name: BuildArtifact
-            - Name: DeployRegisterFunc
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Provider: Lambda
-                Version: "1"
-              Configuration:
-                FunctionName: !Ref LambdaRegister
-                S3Bucket: !Ref PipelineArtifactBucket
-                S3Key: target/my-application.jar
-              InputArtifacts:
-                - Name: BuildArtifact
-            - Name: DeployGetImageFunc
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Provider: Lambda
-                Version: "1"
-              Configuration:
-                FunctionName: !Ref LambdaGetImage
-                S3Bucket: !Ref PipelineArtifactBucket
-                S3Key: target/my-application.jar
-              InputArtifacts:
-                - Name: BuildArtifact
-            - Name: DeployGetInfoFunc
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Provider: Lambda
-                Version: "1"
-              Configuration:
-                FunctionName: !Ref LambdaGetInfo
-                S3Bucket: !Ref PipelineArtifactBucket
-                S3Key: target/my-application.jar
-              InputArtifacts:
-                - Name: BuildArtifact
-            - Name: DeployImageUploadedFunc
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Provider: Lambda
-                Version: "1"
-              Configuration:
-                FunctionName: !Ref LambdaImageUploaded
-                S3Bucket: !Ref PipelineArtifactBucket
-                S3Key: target/my-application.jar
-              InputArtifacts:
-                - Name: BuildArtifact
-            - Name: DeployImageUploadedFunc
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Provider: Lambda
-                Version: "1"
-              Configuration:
-                FunctionName: !Ref LambdaRequestUploadImage
-                S3Bucket: !Ref PipelineArtifactBucket
-                S3Key: target/my-application.jar
+                ProjectName: !Ref CodeBuildDeployLambda
               InputArtifacts:
                 - Name: BuildArtifact
 

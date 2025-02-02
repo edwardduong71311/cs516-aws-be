@@ -2,8 +2,10 @@ version: 0.2
 
 phases:
   install:
-    runtime-versions:
-      java: 17
+    commands:
+      - yum install -y java-17-amazon-corretto-devel
+      - export JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto
+      - yum install -y maven
   build:
     commands:
       - mvn package

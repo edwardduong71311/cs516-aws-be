@@ -1,0 +1,708 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  StackPrefix:
+    Description: The prefix of the stack to identification.
+    Type: String
+    Default: "csxxx"
+  GitHubToken:
+    Type: String
+    NoEcho: true
+    Description: GitHub OAuth token for accessing the repository
+  GitHubOwner:
+    Type: String
+    Description: GitHub username or organization
+  FERepo:
+    Type: String
+    Description: GitHub repository name
+  FEBranch:
+    Type: String
+    Default: main
+    Description: Branch to track in the GitHub repository
+  BERepo:
+    Type: String
+    Description: GitHub repository name
+  BEBranch:
+    Type: String
+    Default: main
+    Description: Branch to track in the GitHub repository
+
+Resources:
+#  S3Website:
+#    Type: AWS::S3::Bucket
+#    Properties:
+#      BucketName: !Sub "${StackPrefix}-website"
+#      PublicAccessBlockConfiguration:
+#        BlockPublicAcls: false
+#        BlockPublicPolicy: false
+#        IgnorePublicAcls: false
+#        RestrictPublicBuckets: false
+#      WebsiteConfiguration:
+#        IndexDocument: index.html
+#        ErrorDocument: error.html
+#
+#  BucketPolicy:
+#    Type: AWS::S3::BucketPolicy
+#    Properties:
+#      Bucket: !Ref S3Website
+#      PolicyDocument:
+#        Version: '2012-10-17'
+#        Statement:
+#          - Sid: PublicReadForGetBucketObjects
+#            Effect: Allow
+#            Principal: "*"
+#            Action: 's3:GetObject'
+#            Resource: !Sub "arn:aws:s3:::${S3Website}/*"
+#
+#  CloudFrontDistribution:
+#    Type: AWS::CloudFront::Distribution
+#    Properties:
+#      DistributionConfig:
+#        Origins:
+#          - Id: WebsiteS3Origin
+#            DomainName: !Sub "${S3Website}.s3-website-${AWS::Region}.amazonaws.com"
+#            CustomOriginConfig:
+#              HTTPPort: 80
+#              HTTPSPort: 443
+#              OriginProtocolPolicy: http-only
+#        Enabled: true
+#        DefaultRootObject: index.html
+#        DefaultCacheBehavior:
+#          TargetOriginId: WebsiteS3Origin
+#          ViewerProtocolPolicy: redirect-to-https
+#          ForwardedValues:
+#            QueryString: false
+#            Cookies:
+#              Forward: none
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${StackPrefix}-lambda-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+  LambdaExecutionPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "${StackPrefix}-lambda-policy"
+      Roles:
+        - !Ref LambdaExecutionRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "logs:CreateLogGroup"
+            Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource:
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${StackPrefix}-*:*"
+
+          - Sid: "AllowToDynamoDB"
+            Effect: Allow
+            Action:
+              - "dynamodb:BatchGetItem"
+              - "dynamodb:BatchWriteItem"
+              - "dynamodb:PutItem"
+              - "dynamodb:GetItem"
+              - "dynamodb:Scan"
+              - "dynamodb:Query"
+              - "dynamodb:UpdateItem"
+            Resource:
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${StackPrefix}-*"
+
+          - Sid: "AllowToGetPutS3"
+            Effect: Allow
+            Action:
+              - "s3:PutObject"
+              - "s3:GetObject"
+            Resource:
+              - !Sub "arn:aws:s3:::${StackPrefix}-*/*"
+
+          - Sid: "AllowGetParametersStore"
+            Effect: Allow
+            Action:
+              - "ssm:GetParameters"
+              - "ssm:GetParameter"
+            Resource:
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/CS516_*"
+
+  LambdaLogin:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${StackPrefix}-login-func"
+      Runtime: java17
+      Handler: edward.duong.LoginHandler::handleRequest
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      MemorySize: 512
+      Code:
+        S3Bucket: cf-templates-2ja0qmhcxurm-us-east-1
+        S3Key: placeholder.jar
+  LambdaRegister:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${StackPrefix}-register-func"
+      Runtime: java17
+      Handler: edward.duong.RegisterHandler::handleRequest
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      MemorySize: 512
+      Code:
+        S3Bucket: cf-templates-2ja0qmhcxurm-us-east-1
+        S3Key: placeholder.jar
+  LambdaGetImage:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${StackPrefix}-get-image-func"
+      Runtime: java17
+      Handler: edward.duong.GetImageHandler::handleRequest
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      MemorySize: 512
+      Code:
+        S3Bucket: cf-templates-2ja0qmhcxurm-us-east-1
+        S3Key: placeholder.jar
+  LambdaGetInfo:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${StackPrefix}-get-info-func"
+      Runtime: java17
+      Handler: edward.duong.GetInfoHandler::handleRequest
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      MemorySize: 512
+      Code:
+        S3Bucket: cf-templates-2ja0qmhcxurm-us-east-1
+        S3Key: placeholder.jar
+  LambdaImageUploaded:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${StackPrefix}-image-uploaded-func"
+      Runtime: java17
+      Handler: edward.duong.ImageUploadedHandler::handleRequest
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      MemorySize: 512
+      Code:
+        S3Bucket: cf-templates-2ja0qmhcxurm-us-east-1
+        S3Key: placeholder.jar
+  LambdaRequestUploadImage:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${StackPrefix}-request-upload-image-func"
+      Runtime: java17
+      Handler: edward.duong.RequestUploadImageHandler::handleRequest
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      MemorySize: 512
+      Code:
+        S3Bucket: cf-templates-2ja0qmhcxurm-us-east-1
+        S3Key: placeholder.jar
+
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "${StackPrefix}-api-gateway"
+  ImageResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: image
+  UserResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: user
+
+  LoginMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref UserResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaLogin.Arn}/invocations"
+            - { LambdaFunction: !Ref LambdaLogin }
+  RegisterMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref UserResource
+      HttpMethod: PUT
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: PUT
+        Uri:
+          Fn::Sub:
+            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaRegister.Arn}/invocations"
+            - { LambdaFunction: !Ref LambdaRegister }
+  GetInfoMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref UserResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: GET
+        Uri:
+          Fn::Sub:
+            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaGetInfo.Arn}/invocations"
+            - { LambdaFunction: !Ref LambdaGetInfo }
+  GetImageMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ImageResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: GET
+        Uri:
+          Fn::Sub:
+            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaGetImage.Arn}/invocations"
+            - { LambdaFunction: !Ref LambdaGetImage }
+  RequestImageUploadMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ImageResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaRequestUploadImage.Arn}/invocations"
+            - { LambdaFunction: !Ref LambdaRequestUploadImage }
+  ImageOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ImageResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Headers: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{ "statusCode": 200 }'
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseParameters:
+              #method.response.header.Access-Control-Allow-Origin: !Sub "'https://${CloudFrontDistribution.DomainName}'"
+              method.response.header.Access-Control-Allow-Origin: !Sub "'https://google.com'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+  UserOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref UserResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Headers: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{ "statusCode": 200 }'
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseParameters:
+#              method.response.header.Access-Control-Allow-Origin: !Sub "'https://${CloudFrontDistribution.DomainName}'"
+              method.response.header.Access-Control-Allow-Origin: !Sub "'https://google.com'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST,PUT'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+
+  Deployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ImageOptionsMethod
+      - UserOptionsMethod
+      - LoginMethod
+      - RegisterMethod
+      - GetInfoMethod
+      - GetImageMethod
+      - RequestImageUploadMethod
+    Properties:
+      RestApiId: !Ref ApiGateway
+      StageName: prod
+
+  LambdaGetInfoInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaGetInfo
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/GET/user"
+  LambdaLoginInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaLogin
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/POST/user"
+  LambdaRegisterInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaRegister
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/PUT/user"
+  LambdaGetImageInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaGetImage
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/GET/image"
+  LambdaRequestUploadImageLoginInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaRequestUploadImage
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/POST/image"
+
+  ImageUploadedLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaImageUploaded
+      Action: "lambda:InvokeFunction"
+      Principal: "s3.amazonaws.com"
+      SourceArn: !Sub "arn:aws:s3:::${StackPrefix}-image-holder"
+
+  S3Image:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${StackPrefix}-image-holder"
+      AccessControl: Private
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+#              - !Sub "https://${CloudFrontDistribution.DomainName}"
+              - "*"
+            AllowedMethods:
+              - PUT
+            AllowedHeaders:
+              - "*"
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: "s3:ObjectCreated:Put"
+            Function: !GetAtt LambdaImageUploaded.Arn
+
+  PipelineArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${StackPrefix}-codepipeline-artifacts"
+
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${StackPrefix}-pipeline-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+                - codebuild.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${StackPrefix}-pipeline-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::${PipelineArtifactBucket}"
+                  - !Sub "arn:aws:s3:::${PipelineArtifactBucket}/*"
+                  - !Sub "arn:aws:s3:::${S3Website}"
+                  - !Sub "arn:aws:s3:::${S3Website}/*"
+              - Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                  - codebuild:StopBuild
+                Resource:
+                  - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${StackPrefix}-fe-project"
+                  - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${StackPrefix}-be-project"
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource: "*"
+
+  BECodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${StackPrefix}-be-project"
+      ServiceRole: !GetAtt CodePipelineRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: "aws/codebuild/amazonlinux-x86_64-standard:5.0"
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: JAVA_HOME
+            Value: "/usr/lib/jvm/java-17-amazon-corretto"
+      Cache:
+        Type: S3
+        Location: !Ref PipelineArtifactBucket
+
+  BECodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub "${StackPrefix}-be-pipeline"
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GitHubSource
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: '1'
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                Owner: !Ref GitHubOwner
+                Repo: !Ref BERepo
+                Branch: !Ref BEBranch
+                OAuthToken: !Ref GitHubToken
+                PollForSourceChanges: false
+              RunOrder: 1
+
+        - Name: Build
+          Actions:
+            - Name: CodeBuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ProjectName: !Ref BECodeBuildProject
+              RunOrder: 1
+
+        - Name: Deploy
+          Actions:
+            - Name: DeployLoginFunc
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: Lambda
+                Version: "1"
+              Configuration:
+                FunctionName: !Ref LambdaLogin
+                S3Bucket: !Ref PipelineArtifactBucket
+                S3Key: target/my-application.jar
+              InputArtifacts:
+                - Name: BuildArtifact
+            - Name: DeployRegisterFunc
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: Lambda
+                Version: "1"
+              Configuration:
+                FunctionName: !Ref LambdaRegister
+                S3Bucket: !Ref PipelineArtifactBucket
+                S3Key: target/my-application.jar
+              InputArtifacts:
+                - Name: BuildArtifact
+            - Name: DeployGetImageFunc
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: Lambda
+                Version: "1"
+              Configuration:
+                FunctionName: !Ref LambdaGetImage
+                S3Bucket: !Ref PipelineArtifactBucket
+                S3Key: target/my-application.jar
+              InputArtifacts:
+                - Name: BuildArtifact
+            - Name: DeployGetInfoFunc
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: Lambda
+                Version: "1"
+              Configuration:
+                FunctionName: !Ref LambdaGetInfo
+                S3Bucket: !Ref PipelineArtifactBucket
+                S3Key: target/my-application.jar
+              InputArtifacts:
+                - Name: BuildArtifact
+            - Name: DeployImageUploadedFunc
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: Lambda
+                Version: "1"
+              Configuration:
+                FunctionName: !Ref LambdaImageUploaded
+                S3Bucket: !Ref PipelineArtifactBucket
+                S3Key: target/my-application.jar
+              InputArtifacts:
+                - Name: BuildArtifact
+            - Name: DeployImageUploadedFunc
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: Lambda
+                Version: "1"
+              Configuration:
+                FunctionName: !Ref LambdaRequestUploadImage
+                S3Bucket: !Ref PipelineArtifactBucket
+                S3Key: target/my-application.jar
+              InputArtifacts:
+                - Name: BuildArtifact
+
+#  FECodeBuildProject:
+#    Type: AWS::CodeBuild::Project
+#    Properties:
+#      Name: !Sub "${StackPrefix}-fe-project"
+#      ServiceRole: !GetAtt CodePipelineRole.Arn
+#      Artifacts:
+#        Type: CODEPIPELINE
+#      Source:
+#        Type: CODEPIPELINE
+#        BuildSpec: buildspec.yml
+#      Environment:
+#        ComputeType: BUILD_GENERAL1_SMALL
+#        Image: aws/codebuild/standard:7.0
+#        Type: LINUX_CONTAINER
+#      Cache:
+#        Type: S3
+#        Location: !Ref PipelineArtifactBucket
+#
+#  FECodePipeline:
+#    Type: AWS::CodePipeline::Pipeline
+#    Properties:
+#      Name: !Sub "${StackPrefix}-fe-pipeline"
+#      RoleArn: !GetAtt CodePipelineRole.Arn
+#      ArtifactStore:
+#        Type: S3
+#        Location: !Ref PipelineArtifactBucket
+#      Stages:
+#        - Name: Source
+#          Actions:
+#            - Name: GitHubSource
+#              ActionTypeId:
+#                Category: Source
+#                Owner: ThirdParty
+#                Provider: GitHub
+#                Version: '1'
+#              OutputArtifacts:
+#                - Name: SourceArtifact
+#              Configuration:
+#                Owner: !Ref GitHubOwner
+#                Repo: !Ref FERepo
+#                Branch: !Ref FEBranch
+#                OAuthToken: !Ref GitHubToken
+#                PollForSourceChanges: false
+#              RunOrder: 1
+#
+#        - Name: Build
+#          Actions:
+#            - Name: CodeBuildAction
+#              ActionTypeId:
+#                Category: Build
+#                Owner: AWS
+#                Provider: CodeBuild
+#                Version: '1'
+#              InputArtifacts:
+#                - Name: SourceArtifact
+#              OutputArtifacts:
+#                - Name: BuildArtifact
+#              Configuration:
+#                ProjectName: !Ref FECodeBuildProject
+#              RunOrder: 1
+#
+#        - Name: Deploy
+#          Actions:
+#            - Name: DeployToS3
+#              ActionTypeId:
+#                Category: Deploy
+#                Owner: AWS
+#                Provider: S3
+#                Version: '1'
+#              InputArtifacts:
+#                - Name: BuildArtifact
+#              Configuration:
+#                BucketName: !Ref S3Website
+#                Extract: true
+#              RunOrder: 1
+
+#Outputs:
+#  WebsiteURL:
+#    Value: !GetAtt S3Website.WebsiteURL
+#    Description: URL of the S3 Website
+#  CloudFrontURL:
+#    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
+#    Description: URL of the CloudFront Distribution
+#  FePipelineUrl:
+#    Description: "AWS CodePipeline For FE"
+#    Value: !Sub "https://console.aws.amazon.com/codesuite/codepipeline/pipelines/${FECodePipeline}/view"

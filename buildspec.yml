@@ -1,0 +1,12 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: 17
+  build:
+    commands:
+      - mvn package
+artifacts:
+  files:
+    - target/my-application.jar

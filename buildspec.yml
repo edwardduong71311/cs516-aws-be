@@ -9,8 +9,8 @@ phases:
       - export JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto
       - echo "Using JAVA_HOME $JAVA_HOME"
       - mvn package
+      - ls -l target/
 
 artifacts:
   files:
-    - "*.jar"
-  base-directory: target
+    - "target/*.jar"

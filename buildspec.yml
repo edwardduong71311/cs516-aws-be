@@ -3,11 +3,11 @@ version: 0.2
 phases:
   install:
     commands:
-      - yum install -y java-17-amazon-corretto-devel
-      - export JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto
-      - yum install -y maven
+      - echo "Using JAVA_HOME: $JAVA_HOME"
   build:
     commands:
+      - export JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto
+      - echo "Using JAVA_HOME: $JAVA_HOME"
       - mvn package
 artifacts:
   files:

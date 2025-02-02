@@ -1,9 +1,9 @@
 version: 0.2
 
 phases:
-  install:
+  pre_build:
     commands:
-      - echo "Using JAVA_HOME: $JAVA_HOME"
+      - echo "JAVA_HOME is set to $JAVA_HOME"
   build:
     commands:
       - export JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto

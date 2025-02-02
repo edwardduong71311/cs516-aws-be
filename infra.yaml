@@ -478,6 +478,12 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${StackPrefix}-fe-project"
                   - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${StackPrefix}-be-project"
+                  - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${StackPrefix}-be-codedeploy"
+              - Effect: Allow
+                Action:
+                  - "lambda:UpdateFunctionCode"
+                Resource:
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${StackPrefix}-*"
               - Effect: Allow
                 Action:
                   - sts:AssumeRole
@@ -504,7 +510,7 @@ Resources:
   CodeBuildDeployLambda:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: !Sub "${StackPrefix}-be-codebuild"
+      Name: !Sub "${StackPrefix}-be-codedeploy"
       ServiceRole: !GetAtt CodePipelineRole.Arn
       Environment:
         ComputeType: BUILD_GENERAL1_SMALL

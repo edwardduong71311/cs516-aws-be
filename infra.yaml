@@ -41,40 +41,40 @@ Resources:
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: error.html
-#
-#  BucketPolicy:
-#    Type: AWS::S3::BucketPolicy
-#    Properties:
-#      Bucket: !Ref S3Website
-#      PolicyDocument:
-#        Version: '2012-10-17'
-#        Statement:
-#          - Sid: PublicReadForGetBucketObjects
-#            Effect: Allow
-#            Principal: "*"
-#            Action: 's3:GetObject'
-#            Resource: !Sub "arn:aws:s3:::${S3Website}/*"
-#
-#  CloudFrontDistribution:
-#    Type: AWS::CloudFront::Distribution
-#    Properties:
-#      DistributionConfig:
-#        Origins:
-#          - Id: WebsiteS3Origin
-#            DomainName: !Sub "${S3Website}.s3-website-${AWS::Region}.amazonaws.com"
-#            CustomOriginConfig:
-#              HTTPPort: 80
-#              HTTPSPort: 443
-#              OriginProtocolPolicy: http-only
-#        Enabled: true
-#        DefaultRootObject: index.html
-#        DefaultCacheBehavior:
-#          TargetOriginId: WebsiteS3Origin
-#          ViewerProtocolPolicy: redirect-to-https
-#          ForwardedValues:
-#            QueryString: false
-#            Cookies:
-#              Forward: none
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Website
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: "*"
+            Action: 's3:GetObject'
+            Resource: !Sub "arn:aws:s3:::${S3Website}/*"
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - Id: WebsiteS3Origin
+            DomainName: !Sub "${S3Website}.s3-website-${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+        Enabled: true
+        DefaultRootObject: index.html
+        DefaultCacheBehavior:
+          TargetOriginId: WebsiteS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
 
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -107,7 +107,7 @@ Resources:
               - "logs:CreateLogStream"
               - "logs:PutLogEvents"
             Resource:
-              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${StackPrefix}-*:*"
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*:*"
 
           - Sid: "AllowToDynamoDB"
             Effect: Allow
@@ -120,7 +120,7 @@ Resources:
               - "dynamodb:Query"
               - "dynamodb:UpdateItem"
             Resource:
-              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${StackPrefix}-*"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/cs516-*"
 
           - Sid: "AllowToGetPutS3"
             Effect: Allow
@@ -136,7 +136,7 @@ Resources:
               - "ssm:GetParameters"
               - "ssm:GetParameter"
             Resource:
-              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/CS516_*"
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/CS*"
 
   LambdaLogin:
     Type: AWS::Lambda::Function
@@ -215,6 +215,10 @@ Resources:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: !Sub "${StackPrefix}-api-gateway"
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
   ImageResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -240,8 +244,8 @@ Resources:
         IntegrationHttpMethod: POST
         Uri:
           Fn::Sub:
-            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaLogin.Arn}/invocations"
-            - { LambdaFunction: !Ref LambdaLogin }
+            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction}/invocations"
+            - { LambdaFunction: !GetAtt LambdaLogin.Arn }
   RegisterMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -251,11 +255,11 @@ Resources:
       AuthorizationType: NONE
       Integration:
         Type: AWS_PROXY
-        IntegrationHttpMethod: PUT
+        IntegrationHttpMethod: POST
         Uri:
           Fn::Sub:
-            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaRegister.Arn}/invocations"
-            - { LambdaFunction: !Ref LambdaRegister }
+            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction}/invocations"
+            - { LambdaFunction: !GetAtt LambdaRegister.Arn }
   GetInfoMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -265,11 +269,11 @@ Resources:
       AuthorizationType: NONE
       Integration:
         Type: AWS_PROXY
-        IntegrationHttpMethod: GET
+        IntegrationHttpMethod: POST
         Uri:
           Fn::Sub:
-            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaGetInfo.Arn}/invocations"
-            - { LambdaFunction: !Ref LambdaGetInfo }
+            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction}/invocations"
+            - { LambdaFunction: !GetAtt LambdaGetInfo.Arn }
   GetImageMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -279,11 +283,11 @@ Resources:
       AuthorizationType: NONE
       Integration:
         Type: AWS_PROXY
-        IntegrationHttpMethod: GET
+        IntegrationHttpMethod: POST
         Uri:
           Fn::Sub:
-            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaGetImage.Arn}/invocations"
-            - { LambdaFunction: !Ref LambdaGetImage }
+            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction}/invocations"
+            - { LambdaFunction: !GetAtt LambdaGetImage.Arn }
   RequestImageUploadMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -296,8 +300,8 @@ Resources:
         IntegrationHttpMethod: POST
         Uri:
           Fn::Sub:
-            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaRequestUploadImage.Arn}/invocations"
-            - { LambdaFunction: !Ref LambdaRequestUploadImage }
+            - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction}/invocations"
+            - { LambdaFunction: !GetAtt LambdaRequestUploadImage.Arn }
   ImageOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -318,8 +322,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: "200"
             ResponseParameters:
-              #method.response.header.Access-Control-Allow-Origin: !Sub "'https://${CloudFrontDistribution.DomainName}'"
-              method.response.header.Access-Control-Allow-Origin: !Sub "'https://google.com'"
+              method.response.header.Access-Control-Allow-Origin: !Sub "'https://${CloudFrontDistribution.DomainName}'"
               method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST'"
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
   UserOptionsMethod:
@@ -342,8 +345,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: "200"
             ResponseParameters:
-#              method.response.header.Access-Control-Allow-Origin: !Sub "'https://${CloudFrontDistribution.DomainName}'"
-              method.response.header.Access-Control-Allow-Origin: !Sub "'https://google.com'"
+              method.response.header.Access-Control-Allow-Origin: !Sub "'https://${CloudFrontDistribution.DomainName}'"
               method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST,PUT'"
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
 
@@ -418,8 +420,7 @@ Resources:
       CorsConfiguration:
         CorsRules:
           - AllowedOrigins:
-#              - !Sub "https://${CloudFrontDistribution.DomainName}"
-              - "*"
+              - !Sub "https://${CloudFrontDistribution.DomainName}"
             AllowedMethods:
               - PUT
             AllowedHeaders:
@@ -524,12 +525,13 @@ Resources:
           phases:
             build:
               commands:
-                - aws lambda update-function-code --function-name "${LambdaLogin}" --s3-bucket "${PipelineArtifactBucket}" --s3-key target/my-application.jar
-                - aws lambda update-function-code --function-name "${LambdaRegister}" --s3-bucket "${PipelineArtifactBucket}" --s3-key target/my-application.jar
-                - aws lambda update-function-code --function-name "${LambdaGetImage}" --s3-bucket "${PipelineArtifactBucket}" --s3-key target/my-application.jar
-                - aws lambda update-function-code --function-name "${LambdaGetInfo}" --s3-bucket "${PipelineArtifactBucket}" --s3-key target/my-application.jar
-                - aws lambda update-function-code --function-name "${LambdaImageUploaded}" --s3-bucket "${PipelineArtifactBucket}" --s3-key target/my-application.jar
-                - aws lambda update-function-code --function-name "${LambdaRequestUploadImage}" --s3-bucket "${PipelineArtifactBucket}" --s3-key target/my-application.jar
+                - ls -l
+                - aws lambda update-function-code --function-name "${LambdaLogin}" --zip-file fileb://my-application.jar
+                - aws lambda update-function-code --function-name "${LambdaRegister}" --zip-file fileb://my-application.jar
+                - aws lambda update-function-code --function-name "${LambdaGetImage}" --zip-file fileb://my-application.jar
+                - aws lambda update-function-code --function-name "${LambdaGetInfo}" --zip-file fileb://my-application.jar
+                - aws lambda update-function-code --function-name "${LambdaImageUploaded}" --zip-file fileb://my-application.jar
+                - aws lambda update-function-code --function-name "${LambdaRequestUploadImage}" --zip-file fileb://my-application.jar
       Artifacts:
         Type: CODEPIPELINE
       TimeoutInMinutes: 20
@@ -590,89 +592,86 @@ Resources:
               InputArtifacts:
                 - Name: BuildArtifact
 
-#  FECodeBuildProject:
-#    Type: AWS::CodeBuild::Project
-#    Properties:
-#      Name: !Sub "${StackPrefix}-fe-project"
-#      ServiceRole: !GetAtt CodePipelineRole.Arn
-#      Artifacts:
-#        Type: CODEPIPELINE
-#      Source:
-#        Type: CODEPIPELINE
-#        BuildSpec: buildspec.yml
-#      Environment:
-#        ComputeType: BUILD_GENERAL1_SMALL
-#        Image: aws/codebuild/standard:7.0
-#        Type: LINUX_CONTAINER
-#      Cache:
-#        Type: S3
-#        Location: !Ref PipelineArtifactBucket
-#
-#  FECodePipeline:
-#    Type: AWS::CodePipeline::Pipeline
-#    Properties:
-#      Name: !Sub "${StackPrefix}-fe-pipeline"
-#      RoleArn: !GetAtt CodePipelineRole.Arn
-#      ArtifactStore:
-#        Type: S3
-#        Location: !Ref PipelineArtifactBucket
-#      Stages:
-#        - Name: Source
-#          Actions:
-#            - Name: GitHubSource
-#              ActionTypeId:
-#                Category: Source
-#                Owner: ThirdParty
-#                Provider: GitHub
-#                Version: '1'
-#              OutputArtifacts:
-#                - Name: SourceArtifact
-#              Configuration:
-#                Owner: !Ref GitHubOwner
-#                Repo: !Ref FERepo
-#                Branch: !Ref FEBranch
-#                OAuthToken: !Ref GitHubToken
-#                PollForSourceChanges: false
-#              RunOrder: 1
-#
-#        - Name: Build
-#          Actions:
-#            - Name: CodeBuildAction
-#              ActionTypeId:
-#                Category: Build
-#                Owner: AWS
-#                Provider: CodeBuild
-#                Version: '1'
-#              InputArtifacts:
-#                - Name: SourceArtifact
-#              OutputArtifacts:
-#                - Name: BuildArtifact
-#              Configuration:
-#                ProjectName: !Ref FECodeBuildProject
-#              RunOrder: 1
-#
-#        - Name: Deploy
-#          Actions:
-#            - Name: DeployToS3
-#              ActionTypeId:
-#                Category: Deploy
-#                Owner: AWS
-#                Provider: S3
-#                Version: '1'
-#              InputArtifacts:
-#                - Name: BuildArtifact
-#              Configuration:
-#                BucketName: !Ref S3Website
-#                Extract: true
-#              RunOrder: 1
+  FECodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${StackPrefix}-fe-project"
+      ServiceRole: !GetAtt CodePipelineRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        Type: LINUX_CONTAINER
+      Cache:
+        Type: S3
+        Location: !Ref PipelineArtifactBucket
 
-#Outputs:
-#  WebsiteURL:
-#    Value: !GetAtt S3Website.WebsiteURL
-#    Description: URL of the S3 Website
-#  CloudFrontURL:
-#    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
-#    Description: URL of the CloudFront Distribution
-#  FePipelineUrl:
-#    Description: "AWS CodePipeline For FE"
-#    Value: !Sub "https://console.aws.amazon.com/codesuite/codepipeline/pipelines/${FECodePipeline}/view"
+  FECodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub "${StackPrefix}-fe-pipeline"
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GitHubSource
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: '1'
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                Owner: !Ref GitHubOwner
+                Repo: !Ref FERepo
+                Branch: !Ref FEBranch
+                OAuthToken: !Ref GitHubToken
+                PollForSourceChanges: false
+              RunOrder: 1
+
+        - Name: Build
+          Actions:
+            - Name: CodeBuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ProjectName: !Ref FECodeBuildProject
+              RunOrder: 1
+
+        - Name: Deploy
+          Actions:
+            - Name: DeployToS3
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: S3
+                Version: '1'
+              InputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                BucketName: !Ref S3Website
+                Extract: true
+              RunOrder: 1
+
+Outputs:
+  WebsiteURL:
+    Value: !GetAtt S3Website.WebsiteURL
+    Description: URL of the S3 Website
+  CloudFrontURL:
+    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
+    Description: URL of the CloudFront Distribution

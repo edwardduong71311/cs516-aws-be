@@ -560,7 +560,7 @@ Resources:
                 Repo: !Ref BERepo
                 Branch: !Ref BEBranch
                 OAuthToken: !Ref GitHubToken
-                PollForSourceChanges: false
+                PollForSourceChanges: true
               RunOrder: 1
 
         - Name: Build
@@ -634,7 +634,7 @@ Resources:
                 Repo: !Ref FERepo
                 Branch: !Ref FEBranch
                 OAuthToken: !Ref GitHubToken
-                PollForSourceChanges: false
+                PollForSourceChanges: true
               RunOrder: 1
 
         - Name: Build

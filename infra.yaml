@@ -76,6 +76,34 @@ Resources:
             Cookies:
               Forward: none
 
+  DynamoUserTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${StackPrefix}-user"
+      BillingMode: PAY_PER_REQUEST
+      TableClass: STANDARD
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: name
+          AttributeType: S
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH
+        - AttributeName: name
+          KeyType: RANGE
+      ResourcePolicy:
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Deny
+              Principal: "*"
+              Action: "dynamodb:*"
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${StackPrefix}-user"
+              Condition:
+                StringNotEquals:
+                  "aws:PrincipalArn": !Sub "arn:aws:iam::${AWS::AccountId}:role/${StackPrefix}-lambda-role"
+
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -120,7 +148,7 @@ Resources:
               - "dynamodb:Query"
               - "dynamodb:UpdateItem"
             Resource:
-              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/cs516-*"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${StackPrefix}-*"
 
           - Sid: "AllowToGetPutS3"
             Effect: Allow
@@ -148,7 +176,7 @@ Resources:
       Timeout: 15
       MemorySize: 512
       Code:
-        S3Bucket: cf-templates-2ja0qmhcxurm-us-east-1
+        S3Bucket: cs516-common
         S3Key: placeholder.jar
   LambdaRegister:
     Type: AWS::Lambda::Function
@@ -160,7 +188,7 @@ Resources:
       Timeout: 15
       MemorySize: 512
       Code:
-        S3Bucket: cf-templates-2ja0qmhcxurm-us-east-1
+        S3Bucket: cs516-common
         S3Key: placeholder.jar
   LambdaGetImage:
     Type: AWS::Lambda::Function
@@ -172,7 +200,7 @@ Resources:
       Timeout: 15
       MemorySize: 512
       Code:
-        S3Bucket: cf-templates-2ja0qmhcxurm-us-east-1
+        S3Bucket: cs516-common
         S3Key: placeholder.jar
   LambdaGetInfo:
     Type: AWS::Lambda::Function
@@ -184,7 +212,7 @@ Resources:
       Timeout: 15
       MemorySize: 512
       Code:
-        S3Bucket: cf-templates-2ja0qmhcxurm-us-east-1
+        S3Bucket: cs516-common
         S3Key: placeholder.jar
   LambdaImageUploaded:
     Type: AWS::Lambda::Function
@@ -196,7 +224,7 @@ Resources:
       Timeout: 15
       MemorySize: 512
       Code:
-        S3Bucket: cf-templates-2ja0qmhcxurm-us-east-1
+        S3Bucket: cs516-common
         S3Key: placeholder.jar
   LambdaRequestUploadImage:
     Type: AWS::Lambda::Function
@@ -208,7 +236,7 @@ Resources:
       Timeout: 15
       MemorySize: 512
       Code:
-        S3Bucket: cf-templates-2ja0qmhcxurm-us-east-1
+        S3Bucket: cs516-common
         S3Key: placeholder.jar
 
   ApiGateway:
@@ -403,7 +431,6 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn:
         Fn::Sub: "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/POST/image"
-
   ImageUploadedLambdaInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -430,11 +457,53 @@ Resources:
           - Event: "s3:ObjectCreated:Put"
             Function: !GetAtt LambdaImageUploaded.Arn
 
+  ParameterStore1:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: CS516_BUCKET
+      Type: String
+      Value: !Ref S3Image
+      Tier: Standard
+  ParameterStore2:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: CS516_BUCKET_GET_EXP_IN_MINUTE
+      Type: String
+      Value: "10"
+      Tier: Standard
+  ParameterStore3:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: CS516_BUCKET_PUT_EXP
+      Type: String
+      Value: "10"
+      Tier: Standard
+  ParameterStore4:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: CS516_TABLE
+      Type: String
+      Value: !Ref DynamoUserTable
+      Tier: Standard
+  ParameterStore5:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: CS516_TOKEN_EXP
+      Type: String
+      Value: "3600000"
+      Tier: Standard
+  ParameterStore6:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: CS516_TOKEN_SECRET
+      Type: String
+      Value: "CHANGE_ME"
+      Tier: Standard
+
   PipelineArtifactBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "${StackPrefix}-codepipeline-artifacts"
-
   CodePipelineRole:
     Type: AWS::IAM::Role
     Properties:
@@ -507,7 +576,6 @@ Resources:
       Cache:
         Type: S3
         Location: !Ref PipelineArtifactBucket
-
   CodeBuildDeployLambda:
     Type: AWS::CodeBuild::Project
     Properties:
@@ -535,7 +603,6 @@ Resources:
       Artifacts:
         Type: CODEPIPELINE
       TimeoutInMinutes: 20
-
   BECodePipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
@@ -609,7 +676,6 @@ Resources:
       Cache:
         Type: S3
         Location: !Ref PipelineArtifactBucket
-
   FECodePipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
@@ -670,8 +736,5 @@ Resources:
 
 Outputs:
   WebsiteURL:
-    Value: !GetAtt S3Website.WebsiteURL
-    Description: URL of the S3 Website
-  CloudFrontURL:
     Value: !Sub "https://${CloudFrontDistribution.DomainName}"
     Description: URL of the CloudFront Distribution
